@@ -1,114 +1,245 @@
 # Blogify
-🎨 Step 1: Setting Up the Views
 
-**Your views** folder contains everything related to how your pages look.
-Inside it, we’ve made a subfolder called partials/ — here’s why 👇
+🚀 Node.js Blog Project Setup Guide
+📁 Project Structure (Files so far)
+controllers/
+models/
+routes/
+views/
+index.js
 
-📁 views/partials/
+🪄 Step 1: Setting Up the Views
 
-head.ejs → Contains the <head> section (like linking Bootstrap, meta tags, title, etc.).
+Inside the views folder:
 
-scripts.ejs → Contains your <script> tags (Bootstrap JS, custom scripts).
+📂 Create a subfolder named partials, and inside it add:
 
-nav.ejs → Your reusable navbar component (copied/modified from Bootstrap).
+head.ejs
 
-🧠 Reason:
-These files are common across all pages. Instead of repeating them everywhere, we include them once using the EJS include function — keeping our code clean and modular.
+scripts.ejs
 
-🏠 home.ejs
+💡 Reason:
+These files contain code common to every page — helps keep your views clean and modular.
 
-Your main homepage file.
-To use the partials here, you’ll include them like this:
+In home.ejs, include them using:
 
-<%- include('./partials/head') %>   <!-- Inside the <head> -->
-...
-<body>
-  <%- include('./partials/nav') %>  <!-- Navbar inside body -->
-  ...
-  <%- include('./partials/scripts') %> <!-- Scripts before closing body -->
-</body>
+<%- include('./partials/head') %>
+<%- include('./partials/scripts') %>
 
+🧭 Navbar Setup
 
-✨ This way, every page automatically gets the same consistent layout.
+To create a navbar:
 
-👤 models/user.js — Structuring User Data
+Copy Bootstrap’s navbar code.
 
-The model defines how your user’s data will look and behave in MongoDB.
+Save it as partials/nav.ejs.
 
-🧩 Example Schema
+🧩 Model: models/user.js
+
+Defines how user data is structured and stored in MongoDB.
+
+Example:
+
 role: {
   type: String,
 }
 
+🔒 Password Hashing Before Saving
 
-You can add fields like name, email, password, role, etc.
-Each user document in MongoDB follows this blueprint.
+We use Mongoose middleware:
 
-🛡️ Password Hashing Middleware
+userSchema.pre('save', function (next) { ... })
 
-We use a Mongoose pre-save hook to hash passwords before saving users to the database — ensuring their data stays safe.
 
-Let’s break it down 👇
+This runs before saving a user document.
 
-1️⃣ userSchema.pre('save', function(next) {...})
+Why Hash Passwords?
 
-This is a Mongoose middleware.
+Storing plain text passwords is unsafe.
+Instead, we:
 
-It runs right before a user is saved in the database.
+Take the password.
 
-It allows you to modify the user data (e.g., hash passwords).
+“Scramble” it (hashing).
+
+Store the scrambled version + a random “salt”.
+
+🧠 Step-by-Step Explanation
+
+1️⃣ userSchema.pre('save', function (next) { ... })
+Runs before saving — allows modifying data (like hashing passwords).
 
 2️⃣ const user = this;
-
-Refers to the current user document that’s about to be saved.
-Example:
-
-const newUser = new User({ name: "Shiwangi", password: "1234" });
-await newUser.save(); // 'this' refers to newUser
+Refers to the user document being saved.
 
 3️⃣ if (!user.isModified("password")) return;
-
-Checks whether the password has been changed.
-
-Prevents re-hashing if only other fields (like name/email) are updated.
+Hashes only when password changes.
 
 4️⃣ const salt = randomBytes(16).toString('hex');
+Generates a unique salt per user.
 
-Creates a unique random salt for each user.
+5️⃣
 
-Even if two users have the same password, their hashes will differ.
-
-5️⃣ Hashing the password:
 const hashedPassword = createHmac('sha256', salt)
   .update(user.password)
-  .digest("hex");
+  .digest('hex');
 
 
-Uses SHA-256 algorithm.
+Creates the hashed (scrambled) version of the password.
 
-“Scrambles” the password into an irreversible string.
+6️⃣ this.salt = salt;
+Stores the salt in the database.
 
-6️⃣ Save salt and hash:
-this.salt = salt;
-this.password = hashedPassword;
+7️⃣ this.password = hashedPassword;
+Replaces the real password with the hashed one.
 
-7️⃣ next();
+8️⃣ next();
+Continues to save the user.
 
-Tells Mongoose the hashing process is complete — proceed to save.
+🧩 Conceptually:
 
-💡 In short:
+This code runs before saving a user.
+It hashes the password (with a random salt) for security.
+It only runs if the password has been modified.
 
-Before saving a user, this middleware securely hashes their password (using a random salt) so no plain-text passwords are ever stored.
+🌐 Routes: routes/user.js
 
-🚦 routes/user.js — Defining Routes
+Defines the routes for:
 
-This file controls where your app takes the user when they visit certain URLs.
+/signin
 
-🧭 Basic Routes
-Route	Method	Description
-/signup	.get()	Displays the signup page (signup.ejs)
-/signup	.post()	Handles form submission — saves the new user
-/signin	.get()	Displays the signin page (signin.ejs)
-/signin	.post()	Verifies user credentials
+/signup
 
-🗺️ Think of it as your map — when users visit a certain path, the route decides what page or logic runs next.
+Each route:
+
+Has .get and .post methods.
+
+Renders signin.ejs or signup.ejs with Bootstrap layout.
+
+🧠 Back to models/user.js
+
+Add a static method:
+
+userSchema.static('matchPassword', function (...) { ... });
+
+💭 What It Does
+
+Checks if the entered password (after hashing) matches the stored hash + salt.
+
+Think of it as:
+
+“matchPassword” = Lock & Key Mechanism 🔐
+If the new hash matches the stored hash, login succeeds.
+
+👉 Tip:
+Copy signup.ejs → rename to signin.ejs → remove the “first name” input.
+
+🔑 Authentication with JWT
+
+We use jsonwebtoken for authentication, so create:
+
+middlewares/authentication.js
+
+🎟️ What JWT Does
+
+A JSON Web Token (JWT) acts like a digital ID card.
+After login, the server gives a token to the client.
+
+🔁 Flow
+
+Function to create a token.
+
+Function to validate it later.
+
+Secret Key:
+Used to sign and verify tokens.
+
+jwt.sign(payload, secretKey);
+
+
+payload → user data
+
+secretKey → ensures the token’s authenticity
+
+⚠️ Handling Errors
+
+In routes/user.js (POST route):
+
+Use a try–catch block to handle wrong credentials.
+
+If login fails:
+
+Re-render signin.ejs
+
+Display an error message
+(No controller changes required)
+
+🧰 Middleware: middlewares/authentication.js
+
+This middleware ensures only logged-in users can access certain routes (like creating/editing blogs).
+
+🧾 How It Works
+
+Checks if the request has a valid JWT token (from cookies or headers).
+
+If valid → allows access.
+
+If invalid → redirects to sign-in page.
+
+🏁 index.js Setup
+
+Install and require cookie-parser:
+
+npm i cookie-parser
+
+
+Then:
+
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
+
+
+💡 Purpose:
+Lets Express read cookies from client requests.
+
+🧩 Dynamic Navbar
+
+After JWT verification, modify your navbar logic in EJS:
+
+<% if (locals.user) { %>
+  <!-- Show username -->
+<% } else { %>
+  <!-- Show Signin button -->
+<% } %>
+
+✍️ Model: models/blog.js
+
+Create a schema to store blog data (title, content, image, etc.).
+
+🧾 View: partials/addBlog.ejs
+
+Use Bootstrap to build a form with:
+
+Cover Image → <input type="file">
+
+Title → <input type="text">
+
+Blog Content → <textarea>
+
+📸 Handling File Uploads (Multer)
+
+Install multer:
+
+npm i multer
+
+
+Then:
+
+Visit the Multer documentation
+.
+
+Copy the storage configuration code.
+
+Paste it into index.js.
+
+Modify the storage block as needed.
